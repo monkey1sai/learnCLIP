@@ -25,10 +25,28 @@ if [[ -z "$STATUS_PORCELAIN" ]]; then
   exit 0
 fi
 
-# 取得 commit 訊息
-if [[ ${#@} -ge 1 ]]; then
-  COMMIT_MSG="$*"
-else
+echo "以下檔案將被加入並提交："
+git status --short
+git add -A
+# 解析參數：接受 -m "commit message"，其餘位置參數視為要 add 的檔案路徑
+COMMIT_MSG=""
+FILES=()
+usage(){
+  echo "Usage: $0 -m \"commit message\" [paths...]" >&2
+  echo "If no paths provided, the script will git add -A (all changes)." >&2
+}
+
+while getopts ":m:h" opt; do
+  case $opt in
+    m) COMMIT_MSG="$OPTARG" ;;
+    h) usage; exit 0 ;;
+    \?) echo "Invalid option: -$OPTARG" >&2; usage; exit 1 ;;
+  esac
+done
+shift $((OPTIND -1))
+FILES=("$@")
+
+if [[ -z "$COMMIT_MSG" ]]; then
   read -r -p "請輸入 commit 訊息: " COMMIT_MSG
   if [[ -z "$COMMIT_MSG" ]]; then
     echo "未提供 commit 訊息，取消。"
@@ -37,8 +55,15 @@ else
 fi
 
 # 顯示將要提交的檔案供確認
-echo "以下檔案將被加入並提交："
-git status --short
+if [[ ${#FILES[@]} -gt 0 ]]; then
+  echo "將加入以下指定檔案："
+  for f in "${FILES[@]}"; do
+    echo "  $f"
+  done
+else
+  echo "沒有指定檔案，將 add 所有變更（git add -A）。"
+  git status --short
+fi
 
 echo
 read -r -p "確認要 add & commit 並 push 到 origin/dev？(y/N): " CONF
@@ -48,7 +73,11 @@ if [[ "$CONF" != "y" && "$CONF" != "Y" ]]; then
 fi
 
 # add & commit
-git add -A
+if [[ ${#FILES[@]} -gt 0 ]]; then
+  git add -- "${FILES[@]}"
+else
+  git add -A
+fi
 # 如果沒有變更，git commit 會失敗；但我們已經檢查過有變更。
 if git commit -m "$COMMIT_MSG"; then
   echo "commit 完成：$(git rev-parse --short HEAD)"
