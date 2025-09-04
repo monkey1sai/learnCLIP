@@ -44,3 +44,31 @@ pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu12
 pip install transformers datasets accelerate bitsandbytes sentencepiece timm wandb lightning pillow numpy scikit-learn
 
 ```
+
+
+```shell
+捨棄變更, fetch到最新點位更新本地版本pull
+
+cd /root/learnCLIP
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "<unknown>")
+echo "Current branch: $BRANCH"
+
+echo "--- git status (porcelain) ---"
+git status --porcelain || true
+
+echo "--- fetching from remote ---"
+git fetch --all --prune || true
+
+echo "--- resetting to origin/$BRANCH (this will discard local changes) ---"
+git reset --hard origin/$BRANCH || true
+
+echo "--- removing untracked files/directories ---"
+git clean -fd || true
+
+echo "--- latest commit now ---"
+git log -1 --oneline || true
+
+echo "--- final git status (porcelain) ---"
+git status --porcelain || true
+```
+
