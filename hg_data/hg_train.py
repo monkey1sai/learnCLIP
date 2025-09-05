@@ -58,7 +58,7 @@ trainer.evaluate() # 評估
 
 # 儲存斷詞後的資料集, 之後可以直接用 load_from_disk() 載入
 tokenized.save_to_disk("proc/imdb_tok")
-# trainer.predict(tokenized["test"])
+trainer.predict(tokenized["test"])
 
 # 轉成 parquet 格式, 可用 pandas.read_parquet() 載入
 from datasets import load_from_disk
