@@ -44,11 +44,15 @@ pooler_output = outputs.pooler_output if "pooler_output" in outputs else None # 
 # 圖像模型
 # =========
 from PIL import Image
+import requests
+
 image_model = resnet50(weights=ResNet50_Weights.DEFAULT)
 image_model.fc = nn.Identity()  # 拿掉最後分類層，輸出特徵向量
 
 # 使用範例
-img = Image.open("images/dog.jpg")
+url = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/cat.png"
+img = Image.open(requests.get(url, stream=True).raw)
+#img = Image.open("images/dog.jpg")
 preprocess = transforms.Compose([
     transforms.Resize(256), # 縮放圖片最短邊到 256
     transforms.CenterCrop(224), # 裁切成 224x224
@@ -57,15 +61,16 @@ preprocess = transforms.Compose([
     # 對每個通道（RGB）做標準化，讓資料分布和模型訓練時一致（這是 ImageNet 的平均值和標準差）
 ])
 
-
+if img.mode != "RGB":
+    img = img.convert("RGB")
 img_tensor = preprocess(img).unsqueeze(0)  # 增加 batch dimension
 # .unsqueeze(0)：把 shape 從 [3, 224, 224] 變成 [1, 3, 224, 224]，多加一個 batch 維度，讓模型能一次處理多張圖（這裡是 1 張
 
 with torch.no_grad():
     img_vec = image_model(img_tensor)
 
-img_vec # shape: [1, 2048]
-print(img_vec) # shape: [1, 2048]
+# 將 image 轉到特徵向量 [1, 2048]
+print('img_vec shape:', img_vec.shape) # shape: [1, 2048]
 
 # =========
 # 融合 + 分類器
@@ -85,5 +90,43 @@ class MultiModalClassifier(nn.Module):
 
 model = MultiModalClassifier()
 
+
+
+
+import torch.optim as optim
+
 output = model(text_vec, img_vec)  # 得到 logits，shape: [1, num_classes]
 print("分類結果 logits:", output)
+
+
+# 標籤（假設是二分類，標籤為 1）
+label = torch.tensor([1])
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = MultiModalClassifier().to(device)
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=1e-4)
+
+# 把特徵和標籤移到 device
+text_vec = text_vec.to(device)
+img_vec = img_vec.to(device)
+label = label.to(device)
+
+
+model.train()
+for epoch in range(5):  # 訓練 5 次
+    optimizer.zero_grad()
+    output = model(text_vec, img_vec)  # [1, num_classes]
+    loss = criterion(output, label)
+    loss.backward()
+    optimizer.step()
+    print(f"Epoch {epoch+1}, Loss: {loss.item():.4f}")
+    
+    
+    
+    
+model.eval()
+with torch.no_grad():
+    output = model(text_vec, img_vec)
+    pred = torch.argmax(output, dim=1)
+    print("推論結果 logits:", output)
+    print("預測類別:", pred.item())
